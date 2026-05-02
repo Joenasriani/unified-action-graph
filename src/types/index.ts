@@ -62,7 +62,7 @@ export interface AuditLogEntry {
   actorId?: string;
   action: string; // e.g., 'PROMOTED_TO_DETECTION', 'EXECUTED_ACTION', 'WORKFLOW_CREATED'
   targetId: string; // ID of the entity/workflow/detection affected
-  targetType: 'SIGNAL' | 'DETECTION' | 'WORKFLOW' | 'COA' | 'SYSTEM' | 'CONNECTOR';
+  targetType: 'SIGNAL' | 'DETECTION' | 'WORKFLOW' | 'COA' | 'SYSTEM' | 'CONNECTOR' | 'OSINT_SEED' | 'FINDING' | 'EVIDENCE' | 'ENRICHMENT_RUN';
   details: string;
 }
 
@@ -140,4 +140,81 @@ export interface PublicSourceCandidate {
   url: string;
   recommendedUse: 'feed' | 'enrichment' | 'workflow_action' | 'reference';
   status: 'reference_only' | 'demo_template';
+}
+
+export type OsintSeedType = 'domain' | 'ip' | 'url' | 'email' | 'username' | 'company' | 'github_repo';
+export type EnrichmentConnectorId = 'dns' | 'rdap' | 'urlhaus' | 'github';
+export type FindingSourceType = 'live_dns' | 'live_rdap' | 'live_urlhaus' | 'live_github' | 'manual' | 'demo';
+export type FindingSeverity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface OsintSeed {
+  id: string;
+  value: string;
+  type: OsintSeedType;
+  createdAt: string;
+  status: 'draft' | 'queued' | 'enriched_live' | 'partial' | 'error';
+  truthStatus: 'live_public_source' | 'demo';
+  findingIds: string[];
+}
+
+export interface Finding {
+  id: string;
+  seedId: string;
+  title: string;
+  description: string;
+  sourceType: FindingSourceType;
+  sourceUrl?: string;
+  confidence: Confidence;
+  severity: FindingSeverity;
+  entities: string[];
+  evidenceIds: string[];
+  createdAt: string;
+  promotedDetectionId?: string;
+}
+
+export interface EvidenceItem {
+  id: string;
+  findingId: string;
+  label: string;
+  sourceName: string;
+  sourceUrl?: string;
+  rawSnippet?: string;
+  capturedAt: string;
+  sourceReliability: 'unknown' | 'low' | 'medium' | 'high';
+}
+
+export interface EnrichmentRun {
+  id: string;
+  seedId: string;
+  connectors: EnrichmentConnectorId[];
+  status: 'queued' | 'running' | 'completed' | 'partial' | 'error';
+  startedAt: string;
+  completedAt?: string;
+  findingIds: string[];
+  evidenceIds: string[];
+  errors: string[];
+}
+
+export interface EnrichmentFindingPayload {
+  title: string;
+  description: string;
+  sourceType: FindingSourceType;
+  sourceUrl?: string;
+  confidence: Confidence;
+  severity: FindingSeverity;
+  entities: string[];
+  evidence: Array<{
+    label: string;
+    sourceName: string;
+    sourceUrl?: string;
+    rawSnippet?: string;
+    sourceReliability: 'unknown' | 'low' | 'medium' | 'high';
+  }>;
+}
+
+export interface EnrichmentConnectorResponse {
+  connector: EnrichmentConnectorId;
+  truthStatus: 'live_public_source';
+  findings: EnrichmentFindingPayload[];
+  errors?: string[];
 }
