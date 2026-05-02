@@ -13,6 +13,7 @@ Current capabilities:
 - Detection creation from feed promotion
 - Workflow creation from detections
 - Deterministic COA generation through local TypeScript rules
+- Optional server-side OpenRouter advisory review endpoint
 - Entity graph visualization with react-force-graph-2d
 - Audit log for promotion, workflow, action execution, and closure events
 
@@ -22,7 +23,7 @@ Current limitations:
 - Connector statuses are UI/demo state only unless real backend integrations are added
 - Zustand state is in-memory and resets on page reload
 - COA execution updates local workflow state only; it does not call live Okta, AWS, firewall, ticketing, or EDR systems
-- AI/LLM integration is optional and should run through a backend/serverless route, not directly from the browser
+- AI/LLM output is advisory only and must not execute external actions
 
 ## Tech stack
 
@@ -77,18 +78,37 @@ npm run preview
 
 Copy `.env.example` to `.env.local` when adding future server-side AI or connector services.
 
-Recommended OpenRouter variables:
+Recommended OpenRouter free-router variables:
 
 ```bash
-OPENROUTER_API_KEY=your_openrouter_key_here
+UNIFIED_ACTION_GRAPH_API=your_openrouter_key_here
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-AI_MODEL=openrouter/auto
-ROBOMARKET_API=your_openrouter_key_here
+AI_MODEL=openrouter/free
 ```
 
-Important: do not expose private API keys in frontend bundles. Future LLM/connector calls should be handled through a backend/serverless route, not through Vite client `define` values.
+Optional compatibility aliases can remain empty unless a backend service expects them:
+
+```bash
+OPENROUTER_API_KEY=
+ROBOMARKET_API=
+FREE_ROBOMARKET_API=
+```
+
+Important: do not expose private API keys in frontend bundles. LLM/connector calls should be handled through backend/serverless routes, not through Vite client `define` values.
 
 OpenRouter: https://openrouter.ai/
+
+## Server-side AI endpoint
+
+The repository includes a server-side advisory endpoint:
+
+```text
+POST /api/ai-review
+```
+
+It uses `UNIFIED_ACTION_GRAPH_API` first, then optional compatibility aliases if present. It defaults to `AI_MODEL=openrouter/free` and returns advisory analysis only.
+
+The deterministic COA engine remains the fallback source of truth. The AI endpoint should only review, summarize, and flag missing evidence. It must not execute external actions.
 
 ## Architecture overview
 
@@ -106,11 +126,10 @@ src/components/layout/  Navigation/layout components
 src/store/              Zustand platform state and actions
 src/services/           Deterministic service logic such as COA generation
 src/types/              Core TypeScript domain models
+api/                    Serverless backend endpoints for Vercel-style deployment
 ```
 
 ## AI upgrade path
-
-The current deterministic COA engine should remain the fallback source of truth. AI should be added only as an optional reviewer/summarizer layer:
 
 1. Deterministic COA engine generates candidate actions.
 2. Server-side AI route reviews context and explains risk, tradeoffs, and missing evidence.
@@ -127,7 +146,7 @@ Recommended next upgrades:
 1. Add persistent storage for feeds, detections, workflows, COAs, and audit logs.
 2. Add authentication and actor identity.
 3. Replace seeded connector state with real connector configuration records.
-4. Add backend routes for connector actions and AI calls.
+4. Wire the UI to the `/api/ai-review` endpoint for optional COA review.
 5. Add append-only audit guarantees, before/after diffs, and exportable case reports.
 6. Add mobile/tablet responsive layouts for dense views and graph fallback states.
 7. Add deterministic tests for promotion, workflow creation, COA generation, and audit logging.
@@ -142,6 +161,14 @@ Suggested Vercel settings:
 - Build command: `npm run build`
 - Output directory: `dist`
 - Install command: `npm install`
+
+Vercel environment variables:
+
+```bash
+UNIFIED_ACTION_GRAPH_API=your_openrouter_key_here
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+AI_MODEL=openrouter/free
+```
 
 ## Data truth policy
 
