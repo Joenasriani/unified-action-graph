@@ -1,0 +1,6 @@
+{
+  "name": "Unified Action Graph",
+  "description": "Maven-style unified data visualization and workflow action platform. Consolidates feeds, manages detections, supports graph visualization, and standardizes courses of action.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
