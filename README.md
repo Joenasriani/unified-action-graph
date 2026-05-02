@@ -14,12 +14,14 @@ Current capabilities:
 - Workflow creation from detections
 - Deterministic COA generation through local TypeScript rules
 - Entity graph visualization with react-force-graph-2d
+- Connector/source catalog for reference-only integration planning
 - Audit log for promotion, workflow, action execution, and closure events
 
 Current limitations:
 
 - Data is seeded demo/sample telemetry unless explicitly replaced by real connectors
 - Connector statuses are UI/demo state only unless real backend integrations are added
+- Source catalog entries are reference-only or demo templates; they do not call external APIs
 - Zustand state is in-memory and resets on page reload
 - COA execution updates local workflow state only; it does not call live Okta, AWS, firewall, ticketing, or EDR systems
 - AI/LLM integration is optional and should run through a backend/serverless route, not directly from the browser
@@ -103,10 +105,26 @@ Main folders:
 ```text
 src/components/views/   UI screens
 src/components/layout/  Navigation/layout components
+src/data/               Demo/reference source catalogs
 src/store/              Zustand platform state and actions
 src/services/           Deterministic service logic such as COA generation
 src/types/              Core TypeScript domain models
 ```
+
+## Connector registry foundation
+
+The connector registry is inspired by public API catalogs and OpenAPI discovery tools, but it is intentionally reference-only in this MVP.
+
+It currently provides:
+
+- source category
+- auth type
+- HTTPS and CORS metadata
+- recommended use: feed, enrichment, workflow action, or reference
+- reference URL or internal template marker
+- explicit truth status showing that the source is not live
+
+See `docs/CONNECTOR_REGISTRY.md` for the connector lifecycle and future live-integration requirements.
 
 ## AI upgrade path
 
