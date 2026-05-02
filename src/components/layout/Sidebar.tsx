@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Activity, ShieldAlert, Network, Box, TerminalSquare, Search, GitMerge, FileText, Share2, Layers
+  Activity, ShieldAlert, Network, TerminalSquare, GitMerge, FileText, Layers, Cable
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -15,6 +15,7 @@ export function Sidebar({ currentView, onChangeView }: SidebarProps) {
     { id: 'detections', label: 'Detections', icon: ShieldAlert },
     { id: 'graph', label: 'Entity Graph', icon: Network },
     { id: 'workflows', label: 'Workflows', icon: GitMerge },
+    { id: 'connectors', label: 'Connectors', icon: Cable },
     { id: 'audit', label: 'Audit Log', icon: FileText },
   ];
 
