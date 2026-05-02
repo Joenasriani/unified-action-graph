@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Activity, ShieldAlert, Network, TerminalSquare, GitMerge, FileText, Layers, Cable
+  Activity, ShieldAlert, Network, TerminalSquare, GitMerge, FileText, Layers, Cable, FileSearch
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -11,6 +11,7 @@ interface SidebarProps {
 export function Sidebar({ currentView, onChangeView }: SidebarProps) {
   const navItems = [
     { id: 'dashboard', label: 'Command Hub', icon: TerminalSquare },
+    { id: 'osint', label: 'OSINT Intake', icon: FileSearch },
     { id: 'feeds', label: 'Raw Feeds', icon: Activity },
     { id: 'detections', label: 'Detections', icon: ShieldAlert },
     { id: 'graph', label: 'Entity Graph', icon: Network },
