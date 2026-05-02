@@ -19,8 +19,8 @@ export function Sidebar({ currentView, onChangeView }: SidebarProps) {
   ];
 
   return (
-    <div className="w-64 bg-surface-900 border-r border-slate-800 flex flex-col h-full shrink-0">
-      <div className="p-4 border-b border-slate-800 flex items-center space-x-3 text-cyan-400">
+    <div className="bg-surface-900 flex flex-col h-full shrink-0">
+      <div className="p-4 border-b border-surface-700 flex items-center space-x-3 text-cyan-400">
         <Layers className="w-6 h-6" />
         <span className="font-mono font-bold tracking-tight text-lg">UAG.core</span>
       </div>
@@ -34,9 +34,9 @@ export function Sidebar({ currentView, onChangeView }: SidebarProps) {
               <li key={item.id}>
                 <button
                   onClick={() => onChangeView(item.id)}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md transition-colors text-sm font-medium ${
+                  className={`w-full flex items-center space-x-3 px-3 py-2 rounded transition-colors text-sm font-medium ${
                     isActive 
-                      ? 'bg-brand-900/40 text-brand-500 border border-brand-900/50' 
+                      ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30' 
                       : 'text-slate-400 hover:text-slate-200 hover:bg-surface-800 border border-transparent'
                   }`}
                 >
@@ -49,10 +49,10 @@ export function Sidebar({ currentView, onChangeView }: SidebarProps) {
         </ul>
       </nav>
 
-      <div className="p-4 border-t border-slate-800 bg-surface-900/50">
+      <div className="p-4 border-t border-surface-700 mt-auto">
         <div className="flex items-center justify-between text-xs font-mono text-slate-500">
           <span>Sys_Status</span>
-          <span className="text-emerald-500 flex items-center"><span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 -animate-pulse"/>NOMINAL</span>
+          <span className="text-emerald-500 flex items-center"><span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"/>NOMINAL</span>
         </div>
       </div>
     </div>

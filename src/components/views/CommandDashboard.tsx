@@ -3,15 +3,17 @@ import { usePlatformStore } from '../../store/usePlatformStore';
 import { format } from 'date-fns';
 import { Box, ShieldAlert, GitMerge, FileText } from 'lucide-react';
 
-function StatCard({ label, value, icon: Icon, colorClass }: any) {
+function StatCard({ label, value, icon: Icon, colorClass, badgeType }: any) {
   return (
-    <div className="bg-surface-800/50 border border-slate-700/50 rounded-lg p-4 flex flex-col justify-between h-32">
+    <div className="bg-surface-800/50 border border-surface-700 rounded-lg p-4 flex flex-col justify-between h-32 relative">
       <div className="flex justify-between items-start text-slate-400">
-        <span className="text-sm font-medium">{label}</span>
+        <span className="uag-header">{label}</span>
         <Icon className={`w-5 h-5 ${colorClass}`} />
       </div>
-      <div className="text-3xl font-mono text-slate-100">
+      <div className="text-3xl font-mono tracking-tighter text-slate-100 flex items-end justify-between">
         {value}
+        {badgeType === 'cyan' && <span className="uag-badge uag-badge-cyan mb-2 text-[8px]">Active</span>}
+        {badgeType === 'amber' && value > 0 && <span className="uag-badge uag-badge-amber mb-2 text-[8px]">Action Req</span>}
       </div>
     </div>
   );
@@ -31,23 +33,23 @@ export function CommandDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard label="Unprocessed Signals" value={unprocessedSignals} icon={Box} colorClass="text-amber-500" />
+        <StatCard label="Unprocessed Signals" value={unprocessedSignals} icon={Box} colorClass="text-amber-500" badgeType="amber" />
         <StatCard label="Active Detections" value={detections.length} icon={ShieldAlert} colorClass="text-red-500" />
-        <StatCard label="Open Workflows" value={openWorkflows} icon={GitMerge} colorClass="text-cyan-500" />
+        <StatCard label="Open Workflows" value={openWorkflows} icon={GitMerge} colorClass="text-cyan-500" badgeType="cyan" />
         <StatCard label="Audit Events" value={auditLogs.length} icon={FileText} colorClass="text-emerald-500" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         {/* Recent Audit Logs */}
-        <div className="bg-surface-800/40 border border-slate-800 rounded-lg flex flex-col h-96">
-          <div className="p-4 border-b border-slate-800 uppercase text-xs font-semibold text-slate-500 tracking-wider">
-            System Event Tape
+        <div className="uag-panel border border-surface-700 rounded-lg flex flex-col h-96">
+          <div className="p-4 border-b border-surface-700 flex items-center justify-between">
+            <span className="uag-header">System Event Tape</span>
           </div>
-          <div className="p-4 overflow-y-auto space-y-3 flex-1 font-mono text-sm">
-            {auditLogs.slice(0, 8).map(log => (
-              <div key={log.id} className="flex space-x-3 text-slate-300">
-                <span className="text-slate-500 shrink-0">[{format(new Date(log.timestamp), 'HH:mm:ss')}]</span>
-                <span className="text-brand-500 shrink-0">{log.action}</span>
+          <div className="p-3 overflow-y-auto space-y-1 flex-1 bg-slate-950">
+            {auditLogs.slice(0, 15).map(log => (
+              <div key={log.id} className="uag-audit-line flex truncate text-slate-300">
+                <span className="text-slate-500 shrink-0 mr-2">[{format(new Date(log.timestamp), 'HH:mm:ss')}]</span>
+                <span className="text-cyan-500 shrink-0 mr-2">{log.action}:</span>
                 <span className="truncate">{log.details}</span>
               </div>
             ))}
@@ -55,13 +57,13 @@ export function CommandDashboard() {
         </div>
 
         {/* Integration Status */}
-        <div className="bg-surface-800/40 border border-slate-800 rounded-lg flex flex-col h-96">
-          <div className="p-4 border-b border-slate-800 uppercase text-xs font-semibold text-slate-500 tracking-wider">
-            Connector Topography
+        <div className="uag-panel border border-surface-700 rounded-lg flex flex-col h-96">
+          <div className="p-4 border-b border-surface-700 flex items-center justify-between">
+            <span className="uag-header">Connector Topography</span>
           </div>
-          <div className="p-4 overflow-y-auto space-y-4">
+          <div className="p-4 overflow-y-auto space-y-2">
             {connectors.map(conn => (
-              <div key={conn.id} className="flex items-center justify-between p-3 rounded bg-surface-900 border border-slate-800">
+              <div key={conn.id} className="flex items-center justify-between p-3 rounded bg-surface-800/50 border border-surface-700">
                 <div className="flex items-center space-x-3">
                   <div className={`w-2 h-2 rounded-full ${conn.status === 'CONNECTED' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-red-500'}`} />
                   <span className="font-medium text-slate-200">{conn.name}</span>

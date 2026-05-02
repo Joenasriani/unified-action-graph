@@ -10,23 +10,26 @@ export function FeedView() {
     <div className="p-6 h-full overflow-y-auto w-full max-w-7xl mx-auto flex flex-col">
       <div className="mb-6 flex justify-between items-end">
         <div>
-          <h1 className="text-2xl font-semibold mb-1 text-slate-100 tracking-tight">Raw Feed Inbox</h1>
+          <h1 className="text-2xl font-bold mb-1 text-slate-100 tracking-tighter">Raw Feed Inbox</h1>
           <p className="text-slate-400 text-sm">Consolidated high-fidelity signals originating from configured connectors.</p>
+        </div>
+        <div className="uag-badge uag-badge-cyan">
+          {signals.filter(s => !s.isProcessed).length} UNPROCESSED
         </div>
       </div>
 
-      <div className="bg-surface-800 rounded-lg border border-slate-700 overflow-hidden flex-1">
+      <div className="uag-panel rounded-lg border border-surface-700 overflow-hidden flex-1 shadow-lg">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-surface-900 border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wider font-semibold">
-              <th className="p-4 w-40">Timestamp</th>
-              <th className="p-4 w-32">Priority</th>
-              <th className="p-4 w-48">Source</th>
-              <th className="p-4">Signal Type / Raw Data</th>
-              <th className="p-4 w-32 text-right">Action</th>
+            <tr className="bg-surface-800/50 border-b border-surface-700">
+              <th className="p-4 w-40 uag-header">Timestamp</th>
+              <th className="p-4 w-32 uag-header">Priority</th>
+              <th className="p-4 w-48 uag-header">Source</th>
+              <th className="p-4 uag-header">Signal Type / Raw Data</th>
+              <th className="p-4 w-32 text-right uag-header">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/80 font-mono text-sm text-slate-300 bg-surface-800/50">
+          <tbody className="divide-y divide-surface-700 font-mono text-sm text-slate-300">
             {signals.map(signal => {
               const priorityColors = {
                 CRITICAL: 'text-red-400 border-red-400 bg-red-400/10',
@@ -36,17 +39,17 @@ export function FeedView() {
               };
 
               return (
-                <tr key={signal.id} className={signal.isProcessed ? 'opacity-40 grayscale pointer-events-none' : 'hover:bg-slate-800/80'}>
-                  <td className="p-4 align-top text-xs">{format(new Date(signal.timestamp), 'MM-dd HH:mm:ss')}</td>
+                <tr key={signal.id} className={signal.isProcessed ? 'opacity-40 grayscale pointer-events-none' : 'hover:bg-surface-800/60'}>
+                  <td className="p-4 align-top text-xs text-slate-400">{format(new Date(signal.timestamp), 'MM-dd HH:mm:ss')}</td>
                   <td className="p-4 align-top">
-                    <span className={`px-2 py-1 text-[10px] border rounded uppercase ${priorityColors[signal.priority]}`}>
+                    <span className={`uag-badge ${priorityColors[signal.priority]}`}>
                       {signal.priority}
                     </span>
                   </td>
-                  <td className="p-4 align-top">{signal.source}</td>
+                  <td className="p-4 align-top font-bold text-cyan-500/80">{signal.source}</td>
                   <td className="p-4 align-top">
-                    <div className="font-semibold text-brand-50 mb-1">{signal.type}</div>
-                    <div className="text-xs text-slate-500 overflow-x-auto whitespace-pre rounded bg-surface-900 p-2 border border-slate-800 max-w-xl">
+                    <div className="font-semibold text-slate-200 mb-1">{signal.type}</div>
+                    <div className="text-xs text-slate-500 overflow-x-auto whitespace-pre rounded bg-slate-950 p-2 border border-surface-700 max-w-xl">
                       {JSON.stringify(signal.rawPayload, null, 2)}
                     </div>
                   </td>
@@ -54,9 +57,9 @@ export function FeedView() {
                     {!signal.isProcessed ? (
                       <button 
                         onClick={() => promoteSignal(signal.id)}
-                        className="inline-flex items-center justify-center px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded text-xs font-semibold font-sans transition-colors"
+                        className="uag-btn-action inline-flex flex-row items-center whitespace-nowrap"
                       >
-                        Promote <ArrowRight className="w-3 h-3 ml-1" />
+                        Promote <ArrowRight className="w-4 h-4 ml-1" />
                       </button>
                     ) : (
                       <span className="text-xs text-slate-500 italic">Promoted</span>

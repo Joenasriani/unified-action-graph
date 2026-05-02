@@ -32,13 +32,13 @@ export function GraphView() {
   }, [nodes.length, dimensions]); // Only rezoom when topology or size changes significantly
 
   return (
-    <div className="relative h-full w-full flex flex-col bg-surface-900 overflow-hidden">
+    <div className="relative h-full w-full flex flex-col bg-transparent overflow-hidden">
       <div className="absolute top-6 left-6 z-10 pointer-events-none">
-        <h1 className="text-2xl font-semibold mb-1 text-slate-100 tracking-tight drop-shadow-md">Entity Graph</h1>
+        <h1 className="text-2xl font-bold mb-1 text-slate-100 tracking-tighter drop-shadow-md">Entity Graph</h1>
         <p className="text-slate-400 text-sm drop-shadow-md">Relational view of entities derived from context and detections.</p>
       </div>
 
-      <div ref={containerRef} className="flex-1 w-full h-full">
+      <div ref={containerRef} className="flex-1 w-full h-full relative z-0">
         {dimensions.width > 0 && (
           <ForceGraph2D
             ref={graphRef}
@@ -46,25 +46,25 @@ export function GraphView() {
             height={dimensions.height}
             graphData={{ nodes: [...nodes], links: [...links] }} // Spread to ensure fresh ref for force-graph
             nodeLabel="label"
-            nodeColor="color"
+            nodeColor={(node) => node.color === '#ef4444' ? '#22d3ee' : node.color} // Recolor detection node to cyan
             nodeRelSize={4}
-            linkColor={() => '#334155'}
-            linkWidth={1.5}
+            linkColor={() => 'rgba(51, 65, 85, 0.5)'}
+            linkWidth={1}
             linkDirectionalArrowLength={3.5}
             linkDirectionalArrowRelPos={1}
-            backgroundColor="#0B0F19" // Super dark Palantir style background
+            backgroundColor="transparent"
           />
         )}
       </div>
       
       {/* Legend overlay */}
-      <div className="absolute bottom-6 right-6 z-10 bg-surface-800/80 backdrop-blur-md border border-slate-700/50 p-4 rounded-lg">
-        <h4 className="text-xs font-mono uppercase text-slate-400 mb-2">Topology Legend</h4>
-        <div className="space-y-2 text-xs text-slate-300">
-           <div className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#f87171] mr-2"/> IPs / Infrastructure</div>
-           <div className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#38bdf8] mr-2"/> User Identities</div>
-           <div className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#fbbf24] mr-2"/> Cloud Assets</div>
-           <div className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#ef4444] mr-2 animate-pulse"/> Active Detections</div>
+      <div className="absolute bottom-6 right-6 z-10 bg-surface-900/80 backdrop-blur-md border border-surface-700/50 p-4 rounded-lg">
+        <h4 className="uag-header mb-2">Topology Legend</h4>
+        <div className="space-y-2 text-xs text-slate-300 font-mono">
+           <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-[#f87171] mr-2 shadow-[0_0_8px_rgba(248,113,113,0.5)]"/> IPs / Infrastructure</div>
+           <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-[#38bdf8] mr-2 shadow-[0_0_8px_rgba(56,189,248,0.5)]"/> User Identities</div>
+           <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-[#fbbf24] mr-2 shadow-[0_0_8px_rgba(251,191,36,0.5)]"/> Cloud Assets</div>
+           <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-cyan-400 mr-2 shadow-[0_0_8px_rgba(34,211,238,0.5)] animate-pulse"/> Active Detections</div>
         </div>
       </div>
     </div>
