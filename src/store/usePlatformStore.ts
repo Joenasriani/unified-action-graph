@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   FeedSignal, Detection, WorkflowInvestigation, 
-  AuditLogEntry, GraphNode, GraphLink, Connector, WorkflowAction 
+  AuditLogEntry, GraphNode, GraphLink, Connector,
+  OsintSeed, OsintSeedType, Finding, EvidenceItem,
+  EnrichmentRun, EnrichmentConnectorId, EnrichmentConnectorResponse, EnrichmentFindingPayload
 } from '../types';
 import { generateDeterministicCOAs } from '../services/coaEngine';
 
@@ -12,22 +14,23 @@ interface PlatformState {
   workflows: WorkflowInvestigation[];
   auditLogs: AuditLogEntry[];
   connectors: Connector[];
-  
-  // Graph Data
+  osintSeeds: OsintSeed[];
+  findings: Finding[];
+  evidenceItems: EvidenceItem[];
+  enrichmentRuns: EnrichmentRun[];
   nodes: GraphNode[];
   links: GraphLink[];
 
-  // Actions
   promoteSignal: (signalId: string) => void;
   createWorkflow: (detectionId: string) => void;
   executeAction: (workflowId: string, actionId: string) => void;
   closeWorkflow: (workflowId: string, resolution: string) => void;
-  
-  // Internal logging
+  createOsintSeed: (value: string, type: OsintSeedType) => string;
+  runEnrichment: (seedId: string, connectors: EnrichmentConnectorId[]) => Promise<void>;
+  promoteFindingToDetection: (findingId: string) => void;
   addAuditLog: (log: Omit<AuditLogEntry, 'id' | 'timestamp'>) => void;
 }
 
-// --- SEED DATA ---
 const SEED_SIGNALS: FeedSignal[] = [
   {
     id: 'sig-001',
@@ -71,10 +74,28 @@ const SEED_LINKS: GraphLink[] = [
   { source: 'jsmith@company.com', target: 'CN-BJ-Gateway', label: 'Login' },
 ];
 
+function severityToPriority(severity: string): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
+  if (severity === 'CRITICAL') return 'CRITICAL';
+  if (severity === 'HIGH') return 'HIGH';
+  if (severity === 'MEDIUM') return 'MEDIUM';
+  return 'LOW';
+}
+
+function connectorAllowedForSeed(connector: EnrichmentConnectorId, seedType: OsintSeedType) {
+  if (connector === 'dns' || connector === 'rdap') return seedType === 'domain' || seedType === 'url';
+  if (connector === 'urlhaus') return seedType === 'domain' || seedType === 'ip' || seedType === 'url';
+  if (connector === 'github') return seedType === 'github_repo';
+  return false;
+}
+
 export const usePlatformStore = create<PlatformState>((set, get) => ({
   signals: SEED_SIGNALS,
   detections: [],
   workflows: [],
+  osintSeeds: [],
+  findings: [],
+  evidenceItems: [],
+  enrichmentRuns: [],
   auditLogs: [{
     id: uuidv4(),
     timestamp: new Date().toISOString(),
@@ -82,7 +103,7 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
     action: 'SYSTEM_STARTUP',
     targetId: 'SYS',
     targetType: 'SYSTEM',
-    details: 'Unified Action Graph engine initialized with 3 initial seed signals.'
+    details: 'Unified Action Graph engine initialized with demo seed signals and live OSINT enrichment routes.'
   }],
   connectors: [
     { id: 'conn-1', name: 'Okta Identity', status: 'CONNECTED', lastSync: new Date().toISOString(), type: 'INGRESS' },
@@ -93,19 +114,167 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
   links: SEED_LINKS,
 
   addAuditLog: (log) => set(state => ({
-    auditLogs: [{
-      ...log,
-      id: uuidv4(),
-      timestamp: new Date().toISOString()
-    }, ...state.auditLogs]
+    auditLogs: [{ ...log, id: uuidv4(), timestamp: new Date().toISOString() }, ...state.auditLogs]
   })),
+
+  createOsintSeed: (value, type) => {
+    const normalized = value.trim();
+    const seedId = `seed-${uuidv4().substring(0, 8)}`;
+    const seed: OsintSeed = {
+      id: seedId,
+      value: normalized,
+      type,
+      createdAt: new Date().toISOString(),
+      status: 'draft',
+      truthStatus: 'live_public_source',
+      findingIds: [],
+    };
+    set(state => ({
+      osintSeeds: [seed, ...state.osintSeeds],
+      nodes: [{ id: seedId, group: 6, label: normalized, val: 14, color: '#22d3ee' }, ...state.nodes]
+    }));
+    get().addAuditLog({ actor: 'USER', action: 'OSINT_SEED_CREATED', targetId: seedId, targetType: 'OSINT_SEED', details: `Created OSINT seed ${normalized} (${type}).` });
+    return seedId;
+  },
+
+  runEnrichment: async (seedId, connectors) => {
+    const seed = get().osintSeeds.find(s => s.id === seedId);
+    if (!seed) return;
+
+    const allowed = connectors.filter(connector => connectorAllowedForSeed(connector, seed.type));
+    const runId = `enrich-${uuidv4().substring(0, 8)}`;
+    const run: EnrichmentRun = {
+      id: runId,
+      seedId,
+      connectors: allowed,
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      findingIds: [],
+      evidenceIds: [],
+      errors: [],
+    };
+
+    set(state => ({
+      enrichmentRuns: [run, ...state.enrichmentRuns],
+      osintSeeds: state.osintSeeds.map(s => s.id === seedId ? { ...s, status: 'queued' } : s)
+    }));
+    get().addAuditLog({ actor: 'SYSTEM', action: 'ENRICHMENT_RUN_STARTED', targetId: runId, targetType: 'ENRICHMENT_RUN', details: `Started OSINT enrichment for ${seed.value} using ${allowed.join(', ') || 'no compatible connectors'}.` });
+
+    const allFindings: Finding[] = [];
+    const allEvidence: EvidenceItem[] = [];
+    const errors: string[] = [];
+
+    for (const connector of allowed) {
+      try {
+        const response = await fetch(`/api/enrich/${connector}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: seed.value, type: seed.type }),
+        });
+        const payload = await response.json() as EnrichmentConnectorResponse;
+        if (payload.errors?.length) errors.push(...payload.errors.map(error => `${connector}: ${error}`));
+
+        payload.findings.forEach((item: EnrichmentFindingPayload) => {
+          const findingId = `finding-${uuidv4().substring(0, 8)}`;
+          const evidenceIds: string[] = [];
+          item.evidence.forEach(evidence => {
+            const evidenceId = `evidence-${uuidv4().substring(0, 8)}`;
+            evidenceIds.push(evidenceId);
+            allEvidence.push({
+              id: evidenceId,
+              findingId,
+              label: evidence.label,
+              sourceName: evidence.sourceName,
+              sourceUrl: evidence.sourceUrl,
+              rawSnippet: evidence.rawSnippet,
+              capturedAt: new Date().toISOString(),
+              sourceReliability: evidence.sourceReliability,
+            });
+          });
+
+          allFindings.push({
+            id: findingId,
+            seedId,
+            title: item.title,
+            description: item.description,
+            sourceType: item.sourceType,
+            sourceUrl: item.sourceUrl,
+            confidence: item.confidence,
+            severity: item.severity,
+            entities: item.entities,
+            evidenceIds,
+            createdAt: new Date().toISOString(),
+          });
+        });
+      } catch (error) {
+        errors.push(`${connector}: ${error instanceof Error ? error.message : 'Unknown enrichment error'}`);
+      }
+    }
+
+    const findingIds = allFindings.map(f => f.id);
+    const evidenceIds = allEvidence.map(e => e.id);
+    const newNodes: GraphNode[] = [];
+    const newLinks: GraphLink[] = [];
+
+    allFindings.forEach(finding => {
+      newNodes.push({ id: finding.id, group: 7, label: finding.title, val: 12, color: finding.severity === 'HIGH' || finding.severity === 'CRITICAL' ? '#ef4444' : '#a78bfa' });
+      newLinks.push({ source: seedId, target: finding.id, label: 'Produced finding' });
+      finding.entities.slice(0, 20).forEach(entity => {
+        if (entity.length > 0) {
+          newNodes.push({ id: entity, group: 8, label: entity, val: 6, color: '#fbbf24' });
+          newLinks.push({ source: finding.id, target: entity, label: 'Entity' });
+        }
+      });
+      finding.evidenceIds.forEach(evidenceId => {
+        newNodes.push({ id: evidenceId, group: 9, label: 'Evidence', val: 4, color: '#94a3b8' });
+        newLinks.push({ source: finding.id, target: evidenceId, label: 'Evidence' });
+      });
+    });
+
+    set(state => ({
+      findings: [...allFindings, ...state.findings],
+      evidenceItems: [...allEvidence, ...state.evidenceItems],
+      enrichmentRuns: state.enrichmentRuns.map(r => r.id === runId ? { ...r, status: errors.length && allFindings.length ? 'partial' : errors.length ? 'error' : 'completed', completedAt: new Date().toISOString(), findingIds, evidenceIds, errors } : r),
+      osintSeeds: state.osintSeeds.map(s => s.id === seedId ? { ...s, status: errors.length && allFindings.length ? 'partial' : errors.length ? 'error' : 'enriched_live', findingIds: [...findingIds, ...s.findingIds] } : s),
+      nodes: [...newNodes.filter(n => !state.nodes.find(existing => existing.id === n.id)), ...state.nodes],
+      links: [...newLinks, ...state.links],
+    }));
+
+    get().addAuditLog({ actor: 'SYSTEM', action: 'ENRICHMENT_RUN_COMPLETED', targetId: runId, targetType: 'ENRICHMENT_RUN', details: `Completed OSINT enrichment for ${seed.value}: ${findingIds.length} finding(s), ${evidenceIds.length} evidence item(s), ${errors.length} error(s).` });
+  },
+
+  promoteFindingToDetection: (findingId) => {
+    const { findings, addAuditLog, nodes, links } = get();
+    const finding = findings.find(f => f.id === findingId);
+    if (!finding || finding.promotedDetectionId) return;
+
+    const detectionId = `det-${uuidv4().substring(0, 8)}`;
+    const detection: Detection = {
+      id: detectionId,
+      signalId: finding.id,
+      timestamp: new Date().toISOString(),
+      title: `OSINT Finding: ${finding.title}`,
+      description: finding.description,
+      confidence: finding.confidence,
+      priority: severityToPriority(finding.severity),
+      relatedEntities: finding.entities,
+    };
+
+    set(state => ({
+      detections: [detection, ...state.detections],
+      findings: state.findings.map(f => f.id === findingId ? { ...f, promotedDetectionId: detectionId } : f),
+      nodes: [{ id: detectionId, group: 0, label: detection.title, val: 12, color: '#ef4444' }, ...nodes],
+      links: [{ source: findingId, target: detectionId, label: 'Promoted to detection' }, ...links],
+    }));
+
+    addAuditLog({ actor: 'USER', action: 'FINDING_PROMOTED_TO_DETECTION', targetId: detectionId, targetType: 'DETECTION', details: `Promoted OSINT finding ${findingId} into detection ${detectionId}.` });
+  },
 
   promoteSignal: (signalId: string) => {
     const { signals, addAuditLog, nodes, links } = get();
     const signal = signals.find(s => s.id === signalId);
     if (!signal || signal.isProcessed) return;
 
-    // Create a new Detection
     const detectionId = `det-${uuidv4().substring(0, 8)}`;
     const newDetection: Detection = {
       id: detectionId,
@@ -118,13 +287,10 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
       relatedEntities: Object.values(signal.rawPayload).map(v => String(v)).filter(v => v.length < 50),
     };
 
-    // Update graph with rough entity extraction
     const newNodes = [...nodes];
     const newLinks = [...links];
     newDetection.relatedEntities.forEach(entity => {
-      if (!newNodes.find(n => n.id === entity)) {
-        newNodes.push({ id: entity, group: 5, label: entity, val: 5, color: '#f472b6' });
-      }
+      if (!newNodes.find(n => n.id === entity)) newNodes.push({ id: entity, group: 5, label: entity, val: 5, color: '#f472b6' });
       newLinks.push({ source: detectionId, target: entity, label: 'Involves' });
     });
     newNodes.push({ id: detectionId, group: 0, label: newDetection.title, val: 12, color: '#ef4444' });
@@ -136,13 +302,7 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
       links: newLinks
     }));
 
-    addAuditLog({
-      actor: 'USER',
-      action: 'PROMOTED_TO_DETECTION',
-      targetId: detectionId,
-      targetType: 'DETECTION',
-      details: `User promoted signal ${signalId} to detection ${detectionId}`
-    });
+    addAuditLog({ actor: 'USER', action: 'PROMOTED_TO_DETECTION', targetId: detectionId, targetType: 'DETECTION', details: `User promoted signal ${signalId} to detection ${detectionId}` });
   },
 
   createWorkflow: (detectionId: string) => {
@@ -152,76 +312,28 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
 
     const workflowId = `wf-${uuidv4().substring(0, 8)}`;
     const coas = generateDeterministicCOAs(detection);
+    const workflow: WorkflowInvestigation = { id: workflowId, detectionId, status: 'OPEN', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), coursesOfAction: coas, notes: [] };
 
-    const workflow: WorkflowInvestigation = {
-      id: workflowId,
-      detectionId,
-      status: 'OPEN',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      coursesOfAction: coas,
-      notes: []
-    };
-
-    set(state => ({
-      workflows: [workflow, ...state.workflows],
-      detections: state.detections.map(d => d.id === detectionId ? { ...d, workflowId } : d)
-    }));
-
-    addAuditLog({
-      actor: 'USER',
-      action: 'WORKFLOW_CREATED',
-      targetId: workflowId,
-      targetType: 'WORKFLOW',
-      details: `Created investigation workflow for detection ${detectionId}. Expected ${coas.length} potential COAs.`
-    });
+    set(state => ({ workflows: [workflow, ...state.workflows], detections: state.detections.map(d => d.id === detectionId ? { ...d, workflowId } : d) }));
+    addAuditLog({ actor: 'USER', action: 'WORKFLOW_CREATED', targetId: workflowId, targetType: 'WORKFLOW', details: `Created investigation workflow for detection ${detectionId}. Expected ${coas.length} potential COAs.` });
   },
 
   executeAction: (workflowId: string, actionId: string) => {
     const { addAuditLog } = get();
-    
     set(state => ({
-      workflows: state.workflows.map(wf => {
-        if (wf.id !== workflowId) return wf;
-        return {
-          ...wf,
-          updatedAt: new Date().toISOString(),
-          status: 'IN_PROGRESS',
-          coursesOfAction: wf.coursesOfAction.map(coa => 
-            coa.id === actionId 
-              ? { ...coa, isExecuted: true, executedAt: new Date().toISOString(), executedBy: 'current_user' }
-              : coa
-          )
-        };
+      workflows: state.workflows.map(wf => wf.id !== workflowId ? wf : {
+        ...wf,
+        updatedAt: new Date().toISOString(),
+        status: 'IN_PROGRESS',
+        coursesOfAction: wf.coursesOfAction.map(coa => coa.id === actionId ? { ...coa, isExecuted: true, executedAt: new Date().toISOString(), executedBy: 'current_user' } : coa)
       })
     }));
-
-    addAuditLog({
-      actor: 'USER',
-      action: 'EXECUTED_ACTION',
-      targetId: actionId,
-      targetType: 'COA',
-      details: `Executed mitigation action ${actionId} in workflow ${workflowId}.`
-    });
+    addAuditLog({ actor: 'USER', action: 'EXECUTED_ACTION', targetId: actionId, targetType: 'COA', details: `Executed mitigation action ${actionId} in workflow ${workflowId}.` });
   },
 
   closeWorkflow: (workflowId: string, resolution: string) => {
     const { addAuditLog } = get();
-    
-    set(state => ({
-      workflows: state.workflows.map(wf => 
-        wf.id === workflowId 
-          ? { ...wf, status: 'CLOSED', updatedAt: new Date().toISOString(), notes: [...wf.notes, `Resolution: ${resolution}`] }
-          : wf
-      )
-    }));
-
-    addAuditLog({
-      actor: 'USER',
-      action: 'WORKFLOW_CLOSED',
-      targetId: workflowId,
-      targetType: 'WORKFLOW',
-      details: `Workflow closed with resolution: ${resolution}`
-    });
+    set(state => ({ workflows: state.workflows.map(wf => wf.id === workflowId ? { ...wf, status: 'CLOSED', updatedAt: new Date().toISOString(), notes: [...wf.notes, `Resolution: ${resolution}`] } : wf) }));
+    addAuditLog({ actor: 'USER', action: 'WORKFLOW_CLOSED', targetId: workflowId, targetType: 'WORKFLOW', details: `Workflow closed with resolution: ${resolution}` });
   }
 }));
