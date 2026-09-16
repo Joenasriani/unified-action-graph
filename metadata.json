@@ -1,6 +1,13 @@
 {
   "name": "Unified Action Graph",
-  "description": "Maven-style unified data visualization and workflow action platform. Consolidates feeds, manages detections, supports graph visualization, and standardizes courses of action.",
+  "description": "Operational intelligence workflow MVP connecting safe public source enrichment, evidence, detections, workflows, deterministic courses of action, entity graphs and audit history.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "Public source metadata enrichment",
+    "Evidence backed findings",
+    "Detection and workflow promotion",
+    "Deterministic courses of action",
+    "Entity graph visualization",
+    "Audit timeline"
+  ]
 }
